@@ -10,5 +10,18 @@ services:
       - ./:/usr/src/app/
     ports:
       - 8000:8000
+    depends_on:
+      - db
     env_file:
       - ./.env.dev
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_django
+      - POSTGRES_PASSWORD=hello_django
+      - POSTGRES_DB=hello_django_dev
+
+volumes:
+  postgres_data:
