@@ -1,6 +1,6 @@
 # Django on Docker
 
-This repo was created using the fine article [Dockerizing Django with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/).
+This repo was created using the fine article [Dockerizing Django with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/) byMichael Herman from the great testdriven.io site.
 
 I will not repeat all the details for this, but note where I found differences in my workflow, and add clarification.
 
@@ -22,16 +22,28 @@ Use the venv to install packages:
 
 ```sh
 python -m venv env
-.\env\Scripts\activate
+source env/Scripts/activate
 pip install xyz
 deactivate
 pip freeze --local > requirements.txt # the article uses a manual approach to this so not sure if we will use it here
 ```
 
+### Local commands
+
 ```sh
 docker-compose build
+docker-compose -f docker-compose.prod.yml up -d --build # for prod
 docker run -d <volume> # what is this for?
-docker-compose up
+docker-compose up # run the containers
+docker-compose down -v # bring down the containers and the associated volumes
+```
+
+### Prod versions
+
+```sh
+docker-compose -f docker-compose.prod.yml down -v
+docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.prod.yml exec web python manage.py migrate --noinput
 ```
 
 ## Versions & Systems
@@ -291,6 +303,182 @@ And it's running again and connected to the db.  Congrats.
 
 What is this for?  It says Gunicorn is a production-grade WSGI (Web Server Gateway Interface) server for production environments.  In my previous DRF projects, it was used when deploying to Heroku, but I was never given a reason as to why it was needed.  When it comes to servers, I thought the whole point was to use Nginx, but I want to understand how (and why) Gunicorn is required and used.
 
+The article does provide [the WSGI chapter](https://testdriven.io/courses/python-web-framework/wsgi/) from the [Building Your Own Python Web Framework](https://testdriven.io/courses/python-web-framework/) course which should answer all our questions.
+
+WSGI - a SET OF RULES for a web server and a web application.
+
 For now, we manually include it in the requirements.txt file: ```gunicorn==21.2.0```
 
 Again, in the past I would install packages with pip and run ```pip freeze --local > requirements.txt```.  I'm not sure why that is not done here, except maybe it is so the exact version is used in the Docker container.
+
+To use Django's built-in server in dev we create docker-compose.prod.yml and .env.prod for prod and use the current one for dev.
+
+I am using version 3.9 here as before, but not sure what changes I might have to make to the path or app name as I did before when fixing the docker-compose.yml file.
+
+The big difference is the command to run the server.
+
+Running locally: ```command: python manage.py runserver 0.0.0.0:8000```
+
+Running in prod: ```command: gunicorn hello_django.wsgi:application --bind 0.0.0.0:8000```
+
+Add that name of the app to the list of names of the app so far:
+
+- app_postgres
+- app_postgres_data
+- django-on-docker
+- django-on-docker_postgres_data
+- hello_django
+
+I thought hello_django was only the postgres db name and user.
+
+Anyhow, back to the changes needed to the path, this is the error I see:
+
+```sh
+$ docker-compose down -v
+time="2024-05-22T06:58:17+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.yml: `version` is obsolete"
+[+] Running 4/4
+ ✔ Container app-web-1       Removed 
+ ✔ Container app-db-1        Removed
+ ✔ Volume app_postgres_data  Removed
+ ✔ Network app_default       Removed
+$ docker-compose -f docker-compose.prod.yml up -d --build
+time="2024-05-22T06:58:31+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.prod.yml: `version` is obsolete"
+[+] Building 0.0s (0/0)  docker:default
+[+] Building 0.0s (0/0)                                                                                                                            docker:default
+unable to prepare context: path "C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\app" not found
+```
+
+from this:
+
+```sh
+services:
+  web:
+    build: ./app
+    command: gunicorn hello_django.wsgi:application --bind 0.0.0.0:8000
+```
+
+to this:
+
+```sh
+services:
+  web:
+    build:
+      context: .  # this solves the issue
+    command: gunicorn hello_django.wsgi:application --bind 0.0.0.0:8000
+```
+
+The big difference is the ```context: .```  adjusted build context path.
+
+Now the containers run and here is the wonderful output:
+
+```sh
+$ docker-compose -f docker-compose.prod.yml up -d --build
+time="2024-05-22T07:08:07+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.prod.yml: `version` is obsolete"
+2024/05/22 07:08:07 http2: server: error reading preface from client //./pipe/docker_engine: file has already been closed
+[+] Building 0.0s (0/0)                                                                                                                            docker:default
+resolve : CreateFile C:\Users\timof\repos\django\django-on-docker\app\app: The system cannot find the file specified.
+timof@BOOK-ANH52UMLGO MINGW64 ~/repos/django/django-on-docker/app (main)
+$ docker-compose -f docker-compose.prod.yml up -d --build
+time="2024-05-22T07:08:48+10:00" 
+level=warning 
+msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.prod.yml: `version` is obsolete"
+[+] Building 8.5s (14/14) FINISHED                                                                                                                 docker:default
+ => [web internal] load build definition from Dockerfile
+ => => transferring dockerfile: 583B
+ => [web internal] load metadata for docker.io/library/python:3.11.4-slim-buster
+ => [web internal] load .dockerignore
+ => => transferring context: 2B
+ => [web 1/9] FROM docker.io/library/python:3.11.4-slim-buster@sha256:c46b0ae5728c2247b99903098ade3176a58e274d9c7d2efeaaab3e0621a53935
+ => [web internal] load build context
+ => => transferring context: 1.69MB
+ => CACHED [web 2/9] WORKDIR /usr/src/app
+ => CACHED [web 3/9] RUN pip install --upgrade pip
+ => CACHED [web 4/9] COPY ./requirements.txt .
+ => CACHED [web 5/9] RUN pip install -r requirements.txt
+ => [web 6/9] COPY ./entrypoint.sh .
+ => [web 7/9] RUN sed -i 's/\r$//g' /usr/src/app/entrypoint.sh
+ => [web 8/9] RUN chmod +x /usr/src/app/entrypoint.sh
+ => [web 9/9] COPY . . 
+ => [web] exporting to image
+ => => exporting layers
+ => => writing image sha256:514ef9692dfe73221665d4b54e0b84d16b431966e07c453d84558d74b8d21db
+ => => naming to docker.io/library/app-web
+[+] Running 4/4
+ ✔ Network app_default         Created
+ ✔ Volume "app_postgres_data"  Created 
+ ✔ Container app-db-1          Started
+ ✔ Container app-web-1         Started
+ ```
+
+ So we might not even need the version line in those yml files.
+
+ Next, the article shows creating a new entrypoint file for production ```entrypoint.prod.sh``` and a giant ```Dockerfile.prod``` for a multi-stage build to reduce the final image size.
+
+About this it says:  *Essentially, builder is a temporary image that's used for building the Python wheels. The wheels are then copied over to the final production image and the builder image is discarded.*
+
+Wait, what?  The Python wheels?
+
+Try it out:
+
+```sh
+$ docker-compose -f docker-compose.prod.yml down -v
+$ docker-compose -f docker-compose.prod.yml up -d --build
+$ docker-compose -f docker-compose.prod.yml exec web python manage.py migrate --noinput
+```
+
+However, in the up command, I see an issue:
+
+```sh
+$ docker-compose -f docker-compose.prod.yml up -d --build
+time="2024-05-22T07:24:42+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.prod.yml: `version` is obsolete"
+[+] Building 6.1s (15/27)                                                                                                                          docker:default
+ => [web internal] load build definition from Dockerfile.prod
+ => => transferring dockerfile: 1.70kB
+ => [web internal] load metadata for docker.io/library/python:3.11.4-slim-buster  
+...
+11.57 ./env/Lib/site-packages/setuptools/_vendor/pyparsing/__init__.py:165:1: F405 'OpAssoc' may be undefined, or defined from star imports: .actions, .core, .exceptions, .helpers, .results, .util
+... thousands of similar errors
+16.29 ./env/Lib/site-packages/typing_extensions.py:3233:13: W503 line break before binary operator
+------
+failed to solve: process "/bin/sh -c flake8 --ignore=E501,F401 ." did not complete successfully: exit code: 1
+```
+
+ChatGPT wants me to open that file and fix all the flak8 errors.  I cannot as it says "review the error messages and fix any coding style or convention violations" because it contains thousands of errors, I have two day jobs, and I did not create this file in the first place.
+
+There must be another way to resolve this error.  So I simply comment out the flake8 commands in the Dockerfile.prod and the containers run.
+
+The next issues:
+
+```sh
+$ docker-compose -f docker-compose.prod.yml up -d --build
+[+] Running 4/4
+ ✔ Network app_default         Created
+ ✔ Volume "app_postgres_data"  Created
+ ✔ Container app-db-1          Started
+ ✔ Container app-web-1         Started
+$  docker-compose -f docker-compose.prod.yml exec web python manage.py migrate --noinput
+time="2024-05-22T07:54:20+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.prod.yml: `version` is obsolete"
+service "web" is not running
+```
+
+```sh
+$ docker ps
+CONTAINER ID   IMAGE         COMMAND                  CREATED          STATUS          PORTS      NAMES
+8ddcdfd9fa30   postgres:15   "docker-entrypoint.s…"   11 minutes ago   Up 11 minutes   5432/tcp   app-db-1
+$ docker ps -a
+CONTAINER ID   IMAGE                   COMMAND                  CREATED          STATUS                        PORTS                    NAMES
+00d5bed91ed2   app-web                 "/home/app/web/entry…"   12 minutes ago   Exited (127) 12 minutes ago                            app-web-1
+8ddcdfd9fa30   postgres:15             "docker-entrypoint.s…"   12 minutes ago   Up 12 minutes                 5432/tcp                 app-db-1
+347a52141309   postgres                "docker-entrypoint.s…"   11 hours ago     Exited (1) 11 hours ago                                friendly_franklin
+4687bf223246   postgres                "docker-entrypoint.s…"   11 hours ago     Exited (1) 11 hours ago                                hopeful_shockley
+e4bcf10d319f   django-gitlab-ec2-web   "/usr/src/app/entryp…"   3 weeks ago      Exited (255) 2 days ago       0.0.0.0:8000->8000/tcp   django-gitlab-ec2-web-1   
+0c4e3e2ecf17   postgres:15             "docker-entrypoint.s…"   3 weeks ago      Exited (255) 2 days ago       5432/tcp                 django-gitlab-ec2-db-1
+$ docker logs app-web-1
+Waiting for postgres...
+PostgreSQL started
+/home/app/web/entrypoint.prod.sh: 14: exec: gunicorn: not found
+```
+
+Apparently I forgot to install gunicorn.  Activate the even and ```pip install gunicorn==21.2.0``` and make sure it's in the requirments file.
+
+Then the three commands shown above all work.
