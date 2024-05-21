@@ -25,6 +25,13 @@ python -m venv env
 .\env\Scripts\activate
 pip install xyz
 deactivate
+pip freeze --local > requirements.txt # the article uses a manual approach to this so not sure if we will use it here
+```
+
+```sh
+docker-compose build
+docker run -d <volume> # what is this for?
+docker-compose up
 ```
 
 ## Versions & Systems
@@ -177,11 +184,113 @@ Error response from daemon: get django-on-docker_postgres_data: no such volume
 
 But after deactivating it, the error is the same.
 
-ChatGPT says I should do this:
+This is what volumes I see now:
 
 ```sh
 $ docker volume ls
-DRIVER    VOLUME NAME
 local     app_postgres_data
-local     django-gitlab-ec2_postgres_data
 ```
+
+So my inspect command should be:
+
+```sh
+$ docker volume inspect app_postgres_data
+[
+    {
+        "CreatedAt": "2024-05-19T12:54:53Z",
+        "Driver": "local",
+        "Labels": {
+            "com.docker.compose.project": "app",
+            "com.docker.compose.version": "2.26.1",
+            "com.docker.compose.volume": "postgres_data"
+        },
+        "Mountpoint": "/var/lib/docker/volumes/app_postgres_data/_data",
+        "Name": "app_postgres_data",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+Here is what is shown in the article:
+
+```sh
+[
+    {
+        "CreatedAt": "2023-07-20T14:15:27Z",
+        "Driver": "local",
+        "Labels": {
+            "com.docker.compose.project": "django-on-docker",
+            "com.docker.compose.version": "2.19.1",
+            "com.docker.compose.volume": "postgres_data"
+        },
+        "Mountpoint": "/var/lib/docker/volumes/django-on-docker_postgres_data/_data",
+        "Name": "django-on-docker_postgres_data",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+How did the article name appear to be a combination of these two names: "django-on-docker_postgres_data"?
+
+Well, the repo is called django-on-docker, so the author might have some mistakes in the article.
+
+Next, add an entrypoint.sh file to the "app" directory to verify that Postgres is healthy before applying the migrations and running the Django development server:
+
+### entrypoint.sh
+
+I'm not really sure why this is needed:
+
+```sh
+#!/bin/sh
+
+if [ "$DATABASE" = "postgres" ]
+then
+    echo "Waiting for postgres..."
+
+    while ! nc -z $SQL_HOST $SQL_PORT; do
+      sleep 0.1
+    done
+
+    echo "PostgreSQL started"
+fi
+
+python manage.py flush --no-input
+python manage.py migrate
+
+exec "$@"
+```
+
+It's purpose is to verify that Postgres is healthy before applying the migrations and running the dev server.
+
+In a note about the flush & migrate lines the article says you may want to comment them out so they don't run on every container start or re-start, but it doesn't explain why you would want to do this.
+
+I actually had to change the while statement to avoid the error ```web-1 | /usr/src/app/entrypoint.sh: 7: /usr/src/app/entrypoint.sh: nc: not found```:
+
+```sh
+    # Check network connectivity to the PostgreSQL host and port
+    while ! timeout 1 bash -c "echo > /dev/tcp/$SQL_HOST/$SQL_PORT"; do
+      sleep 0.1
+    done
+```
+
+### Run the containers
+
+There are few more steps as listed here:
+
+- add an entrypoint.sh file to the "app" directory to verify that Postgres is healthy before applying the migrations and running the Django development server and Update the file permissions locally.
+- update the Dockerfile to copy over the entrypoint.sh file and run it as the Docker entrypoint command
+- Run the containers with ```docker-compose up```
+
+Then goto:  http://127.0.0.1:8000/
+
+And it's running again and connected to the db.  Congrats.
+
+## Gunicorn
+
+What is this for?  It says Gunicorn is a production-grade WSGI (Web Server Gateway Interface) server for production environments.  In my previous DRF projects, it was used when deploying to Heroku, but I was never given a reason as to why it was needed.  When it comes to servers, I thought the whole point was to use Nginx, but I want to understand how (and why) Gunicorn is required and used.
+
+For now, we manually include it in the requirements.txt file: ```gunicorn==21.2.0```
+
+Again, in the past I would install packages with pip and run ```pip freeze --local > requirements.txt```.  I'm not sure why that is not done here, except maybe it is so the exact version is used in the Docker container.
