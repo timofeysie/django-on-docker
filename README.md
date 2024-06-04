@@ -55,15 +55,15 @@ Article dependencies:
 - Python v3.11.4
 
 What I usually use:
-Python 3.10.8 = 3.9.17
-Django version 3.2.
 
-I will stick with Python 3.10.11
-Stick with the tutorial for now.
+- Python 3.10.8 or 3.9.17
+- Django version 3.2.
+
+I will stick with Python 3.10.11.
 
 I am on a Windows 11 laptop.  However, I've found with Python there are different lib versions available for other systems like Mac and Linux.  Apparently Nginx works best with Linux, so eventually I will want to deploy this to EC2,  which means having a container that also uses Linux to develop on could save us later from strange errors.  I found out first hand when trying to deploy my [Pytorch Django React project](https://github.com/timofeysie/pytorch_django_react) in an EC2 instance based on Windows 11 and how much the manual approach to deployment sucks, which is why I'm here getting things right from the start now.
 
-### Creating the project
+### Creating the projectI thou
 
 Here are the first steps from the article:
 
@@ -482,3 +482,33 @@ PostgreSQL started
 Apparently I forgot to install gunicorn.  Activate the even and ```pip install gunicorn==21.2.0``` and make sure it's in the requirments file.
 
 Then the three commands shown above all work.
+
+## Nginx
+
+To update my question about Gunicorn vs. Nginx there is a bit more detail about the role of Nginx in this app.
+
+Nginx acts as a reverse proxy for Gunicorn to handle client requests as well as serve up static files.
+
+### Reverse Proxy
+
+The article has [this link](https://www.f5.com/glossary/reverse-proxy) to explain the reverse proxy which I will I will describe a bit of here.
+
+A proxy sits between the client and the server in order to manage requests and sometimes responses.
+
+A reverse proxy sits in front of web servers and forwards client requests to the servers.
+
+So this seems to explains what that are.  Next, why.
+
+The reverse-proxy link then says: *The requested resources are returned to the client as if they originated from the proxy server itself.*
+
+Does that mean the Gunicorn is a proxy, and Nginx is a reverse-proxy?
+
+Why do we need a reverse proxy?  A reverse proxy also provides smooth flow of network traffic between clients and servers, and the ability to direct requests based on a wide variety of parameters such as user device, location, etc.
+
+Sounds like a load balancer really.  What’s the Difference Between a Reverse Proxy and a Load Balancer then?
+
+A load balancer distributes incoming client requests among a group of servers that all host the same content.
+
+The reverse proxy as the public face of the website.  Some things it provides are increased security, scalability and flexibility as well as web acceleration.
+
+So I'm still not exactly clear about the two servers.  I will continue for now with the setup and get back to this soon.
