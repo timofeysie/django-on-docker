@@ -512,3 +512,89 @@ A load balancer distributes incoming client requests among a group of servers th
 The reverse proxy as the public face of the website.  Some things it provides are increased security, scalability and flexibility as well as web acceleration.
 
 So I'm still not exactly clear about the two servers.  I will continue for now with the setup and get back to this soon.
+
+### Setting up Nginx
+
+First add an nginx: section in the services: section of the docker-compose.prod.yml.  Its not clear from the article exactly where this goes, so I often refer to the [official repo](https://github.com/testdrivenio/django-on-docker/blob/main/docker-compose.prod.yml) to see how it looks in situ.
+
+Then create an nginx folder with two ofiles and folders in it:
+
+```txt
+└── nginx
+    ├── Dockerfile
+    └── nginx.conf
+```
+
+Next update the web section in docker-compose.prod.yml, replacing ports with expose:
+
+```yml
+web:
+  build:
+    context: ./app
+    dockerfile: Dockerfile.prod
+  command: gunicorn hello_django.wsgi:application --bind 0.0.0.0:8000
+  expose:
+    - 8000
+```
+
+Currently, I have:
+
+```yml
+    ports:
+      - 8000:8000
+```
+
+This is not something I came up with myself.  In the docus it shows using ```8000:8000``` in four other places.  I will leave it as this for now to see what happens.
+
+The article says: *port 8000 is only exposed internally, to other Docker services. The port will no longer be published to the host machine* about this.
+
+Test it out again with the prod commands:
+
+```sh
+docker-compose -f docker-compose.prod.yml down -v
+docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.prod.yml exec web python manage.py migrate --noinput
+```
+
+And the app is up and running at http://localhost:1337.  Great.
+
+However, I notice this discrepancy between my project structure and how it should look like in the article:
+
+```txt
+├── .env.dev
+├── .env.prod
+├── .env.prod.db
+├── .gitignore
+├── app
+│   ├── ...
+├── docker-compose.prod.yml
+├── docker-compose.yml
+└── nginx
+    ├── Dockerfile
+    └── nginx.conf
+```
+
+Here all those .env files are *inside* the app directory.  Whoops.  Missed something somewhere.
+
+I will push on for now.  I might have to adjust my steps to get this right for next time.  As this is just a demo app, after finishing it, I will try to do it all again with a real app.
+
+Next up, static files.
+
+## Static Files
+
+## `version` is obsolete" error during connect
+
+When running this command:
+
+```sh
+> docker-compose build
+time="2024-06-04T20:02:24+10:00" level=warning msg="C:\\Users\\timof\\repos\\django\\django-on-docker\\app\\docker-compose.yml: `version` is obsolete"
+error during connect: this error may indicate that the docker daemon is not running: Head "http://%2F%2F.%2Fpipe%2Fdocker_engine/_ping": open //./pipe/docker_engine: The system cannot find the file specified.
+```
+
+This error is not very descriptive of the issue.  This indicates that Docker is not running.  I open the Docker desktop, and then when that is ready, run the build command and it completes.
+
+## Useful inks
+
+- The [official repo](https://github.com/testdrivenio/django-on-docker/blob/main/docker-compose.prod.yml).
+- [Using NGINX and NGINX Plus as an Application Gateway with uWSGI and Django](https://docs.nginx.com/nginx/admin-guide/web-server/app-gateway-uwsgi-django/)
