@@ -1,6 +1,6 @@
 # Django on Docker
 
-This repo was created using the fine article [Dockerizing Django with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/) byMichael Herman from the great testdriven.io site.
+This repo was created using the fine article [Dockerizing Django with Postgres, Gunicorn, and Nginx](https://testdriven.io/blog/dockerizing-django-with-postgres-gunicorn-and-nginx/) by Michael Herman from the great testdriven.io site.
 
 I will not repeat all the details for this, but note where I found differences in my workflow, and add clarification.
 
@@ -581,6 +581,62 @@ I will push on for now.  I might have to adjust my steps to get this right for n
 Next up, static files.
 
 ## Static Files
+
+Step 1. Add a volume to the web and nginx services in docker-compose.prod.yml
+
+```yml
+volumes:
+  postgres_data:
+  static_volume:
+```
+
+Step 2. Create the "/home/app/web/staticfiles" folder in Dockerfile.prod.
+
+```???
+RUN mkdir $APP_HOME/staticfiles
+```
+
+Step 3. Update the Nginx configuration to route static file requests to the "staticfiles" folder in app\nginx\nginx.conf:
+
+```conf
+  location /static/ {
+        alias /home/app/web/staticfiles/;
+  }
+```
+
+At first when starting out after this change, I see this error:
+
+```sh
+$ docker-compose down -v
+no configuration file provided: not found
+```
+
+That is because I was in the parent directory,  not the app directory.  Inside the app dir, that command works.
+
+### Using the staticfiles app without having set the STATIC_ROOT setting to a filesystem path
+
+After configuring static files, I see this error after spinning down the development containers then building and migrating them again.
+
+```sh
+docker-compose -f docker-compose.prod.yml exec web python manage.py collectstatic --no-input --clear
+...
+django.core.exceptions.ImproperlyConfigured: You're using the staticfiles app without having set the STATIC_ROOT setting to a filesystem path.    
+```
+
+That is due to these changes needed in the ```app\hello_django\settings.py``` file:
+
+```py
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+```
+
+Next create the "/home/app/web/staticfiles" folder in Dockerfile.prod
+
+Since we use a non-root user, we'll get a permission denied error when the collectstatic command is run if the directory does not already exist.
+
+To get around this create the folder in the Dockerfile
 
 ## `version` is obsolete" error during connect
 

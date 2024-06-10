@@ -36,6 +36,7 @@ FROM python:3.11.4-slim-buster
 
 # create directory for the app user
 RUN mkdir -p /home/app
+RUN mkdir $APP_HOME/staticfiles
 
 # create the app user
 RUN addgroup --system app && adduser --system --group app
