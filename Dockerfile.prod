@@ -42,6 +42,7 @@ ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
 RUN rm -rf $APP_HOME
 RUN mkdir -p $APP_HOME/staticfiles
+RUN mkdir -p $APP_HOME/mediafiles
 WORKDIR $APP_HOME
 
 # install dependencies

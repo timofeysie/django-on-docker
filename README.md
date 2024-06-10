@@ -657,6 +657,37 @@ Next up, media files.
 
 ## Media Files
 
+Create a new app to perform the static file upload:
+
+```sh
+docker-compose up -d --build
+docker-compose exec web python manage.py startapp upload
+```
+
+Make the following changes:
+
+- Add the new app to the INSTALLED_APPS list in settings.py
+- Update app/upload/views.py:
+- Add a "templates", directory to the "app/upload" directory, and then add a new template called upload.html:
+- Update app/hello_django/urls.py:
+- Update app/hello_django/settings.py
+
+Then upload an image at http://localhost:8000/.
+The image at will be available at http://localhost:8000/media/IMAGE_FILE_NAME.
+
+For example: ```File uploaded at: /media/Screenshot%202024-06-08%20185228.png```
+
+Then for prod,
+
+- Add another volume to the web and nginx services in app\docker-compose.prod.yml
+- Create the "/home/app/web/mediafiles" folder in Dockerfile.prod
+- Update the Nginx config again
+- Add the following to settings.py
+
+## Future improvements
+
+A fully managed database service using AWS rather than managing our own Postgres instance within a container as well as a non-root user for the db and nginx services would be needed to lift production to a professional quality setup.
+
 ## `version` is obsolete" error during connect
 
 When running this command:
