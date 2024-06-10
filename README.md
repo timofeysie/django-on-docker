@@ -636,7 +636,26 @@ Next create the "/home/app/web/staticfiles" folder in Dockerfile.prod
 
 Since we use a non-root user, we'll get a permission denied error when the collectstatic command is run if the directory does not already exist.
 
-To get around this create the folder in the Dockerfile
+To get around this create the folder in the Dockerfile.
+
+However, with these changes, I see this error:
+
+```sh
+> docker-compose -f docker-compose.prod.yml up -d --build
+...
+ => ERROR [web stage-1  6/17] RUN mkdir /home/app/web                                                                                                            0.9s
+------
+ > [web stage-1  6/17] RUN mkdir /home/app/web:
+0.767 mkdir: cannot create directory ‘/home/app/web’: File exists
+------
+failed to solve: process "/bin/sh -c mkdir $APP_HOME" did not complete successfully: exit code: 1
+```
+
+I had repeated the make directory command, and after removing that in Docker.prod, the error goes away.
+
+Next up, media files.
+
+## Media Files
 
 ## `version` is obsolete" error during connect
 

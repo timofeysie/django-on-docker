@@ -34,17 +34,14 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requir
 # pull official base image
 FROM python:3.11.4-slim-buster
 
-# create directory for the app user
-RUN mkdir -p /home/app
-RUN mkdir $APP_HOME/staticfiles
-
 # create the app user
 RUN addgroup --system app && adduser --system --group app
 
-# create the appropriate directories
+# create directory for the app user
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
-RUN mkdir $APP_HOME
+RUN rm -rf $APP_HOME
+RUN mkdir -p $APP_HOME/staticfiles
 WORKDIR $APP_HOME
 
 # install dependencies
